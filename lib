@@ -1,0 +1,411 @@
+local KrnlLibrary = {}
+KrnlLibrary.__index = KrnlLibrary
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local function createUICorner(instance, radius)
+  local corner = Instance.new("UICorner")
+  corner.CornerRadius = UDim.new(0, radius or 6)
+  corner.Parent = instance
+  return corner
+end
+
+local function createShadow(frame)
+  local shadow = Instance.new("Frame")
+  shadow.BackgroundColor3 = Color3.fromRGB(45, 0, 70)
+  shadow.Size = UDim2.new(1, 6, 1, 6)
+  shadow.Position = UDim2.new(0, -3, 0, -3)
+  shadow.ZIndex = frame.ZIndex - 1
+  shadow.AnchorPoint = Vector2.new(0,0)
+  shadow.Parent = frame
+  shadow.BackgroundTransparency = 0.85
+  createUICorner(shadow, 10)
+  return shadow
+end
+
+local function createTextLabel(parent, text, size, color)
+  local label = Instance.new("TextLabel")
+  label.BackgroundTransparency = 1
+  label.Text = text or ""
+  label.TextColor3 = color
+  label.Font = Enum.Font.GothamSemibold
+  label.TextSize = size or 18
+  label.TextWrapped = true
+  label.Size = UDim2.new(1, 0, 0, size + 10)
+  label.Parent = parent
+  return label
+end
+
+function KrnlLibrary.new(title, theme)
+  local self = setmetatable({}, KrnlLibrary)
+
+  self.Theme = theme or {
+    MainBackground = Color3.fromRGB(25, 0, 45),
+    FrameBackground = Color3.fromRGB(20, 0, 40),
+    Accent = Color3.fromRGB(170, 90, 250),
+    AccentDark = Color3.fromRGB(80, 0, 130),
+    TextPrimary = Color3.fromRGB(210, 160, 255),
+    TextSecondary = Color3.fromRGB(200, 180, 255),
+    Shadow = Color3.fromRGB(45, 0, 70),
+    NotificationBackground = Color3.fromRGB(40, 0, 70),
+  }
+
+  local screenGui = Instance.new("ScreenGui")
+  screenGui.Name = "KrnlLibraryUI"
+  screenGui.ResetOnSpawn = false
+  screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+  local mainFrame = Instance.new("Frame")
+  mainFrame.Size = UDim2.new(0, 450, 0, 400)
+  mainFrame.Position = UDim2.new(0.5, -225, 0.5, -200)
+  mainFrame.BackgroundColor3 = self.Theme.MainBackground
+  mainFrame.Parent = screenGui
+  createUICorner(mainFrame, 14)
+
+  createShadow(mainFrame)
+
+  local titleLabel = Instance.new("TextLabel")
+  titleLabel.BackgroundTransparency = 1
+  titleLabel.Text = title or "KrnlLibrary"
+  titleLabel.Font = Enum.Font.GothamBold
+  titleLabel.TextSize = 26
+  titleLabel.TextColor3 = self.Theme.TextPrimary
+  titleLabel.Size = UDim2.new(1, 0, 0, 40)
+  titleLabel.Parent = mainFrame
+
+  local pagesFrame = Instance.new("Frame")
+  pagesFrame.BackgroundTransparency = 1
+  pagesFrame.Position = UDim2.new(0, 10, 0, 50)
+  pagesFrame.Size = UDim2.new(1, -20, 1, -60)
+  pagesFrame.Parent = mainFrame
+
+  self._screenGui = screenGui
+  self._mainFrame = mainFrame
+  self._pagesFrame = pagesFrame
+  self._pages = {}
+  self._theme = self.Theme
+
+  -- Notification container
+  local notifFrame = Instance.new("Frame")
+  notifFrame.Size = UDim2.new(0, 300, 0, 50)
+  notifFrame.Position = UDim2.new(1, -310, 0, 10)
+  notifFrame.BackgroundColor3 = self.Theme.NotificationBackground
+  notifFrame.AnchorPoint = Vector2.new(1, 0)
+  notifFrame.Parent = screenGui
+  createUICorner(notifFrame, 10)
+  notifFrame.Visible = false
+
+  local notifLabel = Instance.new("TextLabel")
+  notifLabel.BackgroundTransparency = 1
+  notifLabel.TextColor3 = self.Theme.TextPrimary
+  notifLabel.Font = Enum.Font.GothamBold
+  notifLabel.TextSize = 18
+  notifLabel.Size = UDim2.new(1, -20, 1, 0)
+  notifLabel.Position = UDim2.new(0, 10, 0, 0)
+  notifLabel.TextXAlignment = Enum.TextXAlignment.Left
+  notifLabel.Parent = notifFrame
+
+  self._notifFrame = notifFrame
+  self._notifLabel = notifLabel
+
+  -- FPS Label
+  local fpsLabel = Instance.new("TextLabel")
+  fpsLabel.Size = UDim2.new(0, 120, 0, 30)
+  fpsLabel.Position = UDim2.new(0, 10, 1, -40)
+  fpsLabel.BackgroundColor3 = self.Theme.FrameBackground
+  fpsLabel.TextColor3 = self.Theme.TextPrimary
+  fpsLabel.Font = Enum.Font.GothamBold
+  fpsLabel.TextSize = 18
+  fpsLabel.Text = "FPS: 0 | MS: 0"
+  fpsLabel.Parent = screenGui
+  createUICorner(fpsLabel, 8)
+  self._fpsLabel = fpsLabel
+
+  local lastTime = tick()
+  local frameCount = 0
+  RunService.RenderStepped:Connect(function()
+    frameCount += 1
+    local now = tick()
+    if now - lastTime >= 1 then
+      local fps = frameCount / (now - lastTime)
+      local ms = 1000 / math.max(fps,1)
+      fpsLabel.Text = string.format("FPS: %d | MS: %.1f", math.floor(fps), ms)
+      frameCount = 0
+      lastTime = now
+    end
+  end)
+
+  return self
+end
+
+function KrnlLibrary:AddPage(name)
+  local page = {}
+  page.Name = name
+
+  local frame = Instance.new("ScrollingFrame")
+  frame.BackgroundColor3 = self._theme.FrameBackground
+  frame.Size = UDim2.new(1, 0, 1, 0)
+  frame.CanvasSize = UDim2.new(0, 0, 2, 0)
+  frame.ScrollBarThickness = 6
+  frame.ScrollBarImageColor3 = self._theme.Accent
+  frame.Parent = self._pagesFrame
+  createUICorner(frame, 12)
+  frame.Visible = false
+  page._frame = frame
+  page._layout = Instance.new("UIListLayout", frame)
+  page._layout.Padding = UDim.new(0, 12)
+  page._layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+  if #self._pages == 0 then
+    frame.Visible = true
+  end
+
+  function page:AddLabel(text)
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Text = text or ""
+    label.TextColor3 = self._theme.TextSecondary
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 20
+    label.TextWrapped = true
+    label.Size = UDim2.new(1, 0, 0, 26)
+    label.Parent = self._frame
+    return label
+  end
+
+  function page:AddButton(text, callback)
+    local button = Instance.new("TextButton")
+    button.Text = text or "Button"
+    button.BackgroundColor3 = self._theme.AccentDark
+    button.TextColor3 = self._theme.TextSecondary
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 18
+    button.Size = UDim2.new(1, 0, 0, 36)
+    button.Parent = self._frame
+    createUICorner(button, 10)
+
+    button.MouseEnter:Connect(function()
+      TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = self._theme.Accent}):Play()
+    end)
+    button.MouseLeave:Connect(function()
+      TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = self._theme.AccentDark}):Play()
+    end)
+
+    button.MouseButton1Click:Connect(function()
+      if callback then
+        callback()
+      end
+    end)
+
+    return button
+  end
+
+  function page:AddColorPicker(labelText, defaultColor, callback)
+    local container = Instance.new("Frame")
+    container.BackgroundColor3 = self._theme.Shadow
+    container.Size = UDim2.new(1, 0, 0, 50)
+    container.Parent = self._frame
+    createUICorner(container, 8)
+
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Text = labelText or ""
+    label.TextColor3 = self._theme.TextSecondary
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 16
+    label.Size = UDim2.new(0.5, 0, 1, 0)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+
+    local picker = Instance.new("TextButton")
+    picker.BackgroundColor3 = defaultColor or self._theme.Accent
+    picker.Size = UDim2.new(0, 50, 0, 30)
+    picker.Position = UDim2.new(0.7, 0, 0.3, 0)
+    picker.Parent = container
+    createUICorner(picker, 6)
+
+    picker.MouseButton1Click:Connect(function()
+      if picker.BackgroundColor3 == self._theme.Accent then
+        picker.BackgroundColor3 = Color3.new(0, 0, 0)
+        if callback then callback(Color3.new(0,0,0)) end
+      else
+        picker.BackgroundColor3 = self._theme.Accent
+        if callback then callback(self._theme.Accent) end
+      end
+    end)
+
+    return container
+  end
+
+  function page:AddBox(placeholder, callback)
+    local box = Instance.new("TextBox")
+    box.PlaceholderText = placeholder or "Type here..."
+    box.BackgroundColor3 = self._theme.Shadow
+    box.TextColor3 = self._theme.TextSecondary
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 18
+    box.Size = UDim2.new(1, 0, 0, 34)
+    box.Parent = self._frame
+    createUICorner(box, 8)
+
+    box.FocusLost:Connect(function(enterPressed)
+      if enterPressed and callback then
+        callback(box.Text)
+      end
+    end)
+
+    return box
+  end
+
+  function page:AddToggle(labelText, defaultState, callback)
+    local container = Instance.new("Frame")
+    container.BackgroundColor3 = self._theme.Shadow
+    container.Size = UDim2.new(1, 0, 0, 36)
+    container.Parent = self._frame
+    createUICorner(container, 8)
+
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Text = labelText or ""
+    label.TextColor3 = self._theme.TextPrimary
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 18
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Size = UDim2.new(0, 50, 0, 28)
+    toggleBtn.Position = UDim2.new(0.75, 0, 0.15, 0)
+    toggleBtn.BackgroundColor3 = defaultState and self._theme.Accent or self._theme.AccentDark
+    toggleBtn.Text = ""
+    toggleBtn.Parent = container
+    createUICorner(toggleBtn, 14)
+
+    local circle = Instance.new("Frame")
+    circle.Size = UDim2.new(0, 24, 0, 24)
+    circle.Position = defaultState and UDim2.new(0.65, 0, 0.1, 0) or UDim2.new(0.05, 0, 0.1, 0)
+    circle.BackgroundColor3 = Color3.fromRGB(240, 230, 255)
+    circle.Parent = toggleBtn
+    createUICorner(circle, 12)
+
+    local state = defaultState
+
+    toggleBtn.MouseButton1Click:Connect(function()
+      state = not state
+      if state then
+        toggleBtn.BackgroundColor3 = self._theme.Accent
+        circle:TweenPosition(UDim2.new(0.65, 0, 0.1, 0), "Out", "Sine", 0.2, true)
+      else
+        toggleBtn.BackgroundColor3 = self._theme.AccentDark
+        circle:TweenPosition(UDim2.new(0.05, 0, 0.1, 0), "Out", "Sine", 0.2, true)
+      end
+      if callback then
+        callback(state)
+      end
+    end)
+
+    return container
+  end
+
+  function page:AddSlider(labelText, min, max, defaultValue, callback)
+    local container = Instance.new("Frame")
+    container.BackgroundColor3 = self._theme.Shadow
+    container.Size = UDim2.new(1, 0, 0, 50)
+    container.Parent = self._frame
+    createUICorner(container, 8)
+
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Text = labelText or ""
+    label.TextColor3 = self._theme.TextPrimary
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 18
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+
+    local sliderBar = Instance.new("Frame")
+    sliderBar.BackgroundColor3 = self._theme.AccentDark
+    sliderBar.Position = UDim2.new(0, 10, 0, 30)
+    sliderBar.Size = UDim2.new(1, -20, 0, 12)
+    sliderBar.Parent = container
+    createUICorner(sliderBar, 6)
+
+    local sliderFill = Instance.new("Frame")
+    sliderFill.BackgroundColor3 = self._theme.Accent
+    sliderFill.Size = UDim2.new((defaultValue - min) / (max - min), 0, 1, 0)
+    sliderFill.Parent = sliderBar
+    createUICorner(sliderFill, 6)
+
+    local sliderBtn = Instance.new("TextButton")
+    sliderBtn.Size = UDim2.new(0, 24, 0, 24)
+    sliderBtn.Position = UDim2.new(sliderFill.Size.X.Scale, 0, 0.5, -12)
+    sliderBtn.BackgroundColor3 = Color3.fromRGB(230, 210, 255)
+    sliderBtn.Text = ""
+    sliderBtn.Parent = sliderBar
+    sliderBtn.AutoButtonColor = false
+    createUICorner(sliderBtn, 12)
+
+    local dragging = false
+
+    sliderBtn.InputBegan:Connect(function(input)
+      if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+      end
+    end)
+
+    sliderBtn.InputEnded:Connect(function(input)
+      if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+      end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+      if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local relativeX = math.clamp(input.Position.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
+        local percent = relativeX / sliderBar.AbsoluteSize.X
+        sliderFill.Size = UDim2.new(percent, 0, 1, 0)
+        sliderBtn.Position = UDim2.new(percent, 0, 0.5, -12)
+        local value = min + (max - min) * percent
+        if callback then
+          callback(value)
+        end
+      end
+    end)
+
+    return container
+  end
+
+  table.insert(self._pages, page)
+  return page
+end
+
+function KrnlLibrary:Notify(text, duration)
+  self._notifLabel.Text = text or "Notification"
+  self._notifFrame.Visible = true
+  self._notifFrame.Position = UDim2.new(1, -310, 0, 10)
+  local tweenIn = TweenService:Create(self._notifFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(1, -310, 0, 10)})
+  tweenIn:Play()
+
+  delay(duration or 3, function()
+    local tweenOut = TweenService:Create(self._notifFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(1, 310, 0, 10)})
+    tweenOut:Play()
+    tweenOut.Completed:Wait()
+    self._notifFrame.Visible = false
+  end)
+end
+
+function KrnlLibrary:SetTheme(newTheme)
+  self._theme = newTheme
+  self._mainFrame.BackgroundColor3 = newTheme.MainBackground or self._mainFrame.BackgroundColor3
+  self._fpsLabel.BackgroundColor3 = newTheme.FrameBackground or self._fpsLabel.BackgroundColor3
+  self._fpsLabel.TextColor3 = newTheme.TextPrimary or self._fpsLabel.TextColor3
+  self._notifFrame.BackgroundColor3 = newTheme.NotificationBackground or self._notifFrame.BackgroundColor3
+  self._notifLabel.TextColor3 = newTheme.TextPrimary or self._notifLabel.TextColor3
+end
+
+return KrnlLibrary
