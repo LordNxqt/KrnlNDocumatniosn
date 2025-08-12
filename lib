@@ -1,1 +1,764 @@
+local NoxUI = {}
+NoxUI.__index = NoxUI
+
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local function create(class)
+    local inst = Instance.new(class)
+    inst.Name = class
+    return inst
+end
+
+local Colors = {
+    Background = Color3.fromRGB(30, 30, 35),
+    TabBackground = Color3.fromRGB(40, 40, 50),
+    TabHover = Color3.fromRGB(65, 65, 80),
+    TabActive = Color3.fromRGB(85, 85, 110),
+    Button = Color3.fromRGB(70, 70, 85),
+    ButtonHover = Color3.fromRGB(90, 90, 120),
+    ToggleOn = Color3.fromRGB(0, 180, 130),
+    ToggleOff = Color3.fromRGB(70, 70, 85),
+    Text = Color3.fromRGB(220, 220, 220),
+    InputBackground = Color3.fromRGB(50, 50, 65),
+    SliderBackground = Color3.fromRGB(70, 70, 90),
+    SliderFill = Color3.fromRGB(0, 180, 130),
+    BindBackground = Color3.fromRGB(60, 60, 75),
+    DropdownBackground = Color3.fromRGB(50, 50, 65),
+    ColorPickerBackground = Color3.fromRGB(45, 45, 60),
+}
+
+function NoxUI.new(title)
+    local self = setmetatable({}, NoxUI)
+
+    self.gui = Instance.new("ScreenGui")
+    self.gui.Name = title or "NoxUI"
+    self.gui.ResetOnSpawn = false
+
+    self.mainFrame = create("Frame")
+    self.mainFrame.Size = UDim2.new(0, 480, 0, 370)
+    self.mainFrame.Position = UDim2.new(0.5, -240, 0.5, -185)
+    self.mainFrame.BackgroundColor3 = Colors.Background
+    self.mainFrame.BorderSizePixel = 0
+    self.mainFrame.Parent = self.gui
+    self.mainFrame.ClipsDescendants = true
+    self.mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    self.mainFrame.Name = "MainFrame"
+    self.mainFrame.ZIndex = 2
+
+    local uicorner = Instance.new("UICorner", self.mainFrame)
+    uicorner.CornerRadius = UDim.new(0, 14)
+    local uistroke = Instance.new("UIStroke", self.mainFrame)
+    uistroke.Color = Color3.new(0, 0, 0)
+    uistroke.Transparency = 0.7
+    uistroke.Thickness = 2
+
+    self.titleLabel = create("TextLabel")
+    self.titleLabel.Text = title or "NoxUI"
+    self.titleLabel.Size = UDim2.new(1, 0, 0, 40)
+    self.titleLabel.BackgroundTransparency = 1
+    self.titleLabel.TextColor3 = Colors.Text
+    self.titleLabel.Font = Enum.Font.GothamBold
+    self.titleLabel.TextSize = 20
+    self.titleLabel.Parent = self.mainFrame
+    self.titleLabel.ZIndex = 3
+
+    self.tabsContainer = create("Frame")
+    self.tabsContainer.Size = UDim2.new(0, 140, 1, -40)
+    self.tabsContainer.Position = UDim2.new(1, -140, 0, 40)
+    self.tabsContainer.BackgroundColor3 = Colors.TabBackground
+    self.tabsContainer.BorderSizePixel = 0
+    self.tabsContainer.Parent = self.mainFrame
+    self.tabsContainer.Name = "TabsContainer"
+    self.tabsContainer.ClipsDescendants = true
+
+    local tabsUICorner = Instance.new("UICorner", self.tabsContainer)
+    tabsUICorner.CornerRadius = UDim.new(0, 14)
+
+    self.contentFrame = create("Frame")
+    self.contentFrame.Size = UDim2.new(1, -140, 1, -40)
+    self.contentFrame.Position = UDim2.new(0, 0, 0, 40)
+    self.contentFrame.BackgroundColor3 = Colors.Background
+    self.contentFrame.BorderSizePixel = 0
+    self.contentFrame.Parent = self.mainFrame
+    self.contentFrame.Name = "ContentFrame"
+    self.contentFrame.ClipsDescendants = true
+
+    local contentUICorner = Instance.new("UICorner", self.contentFrame)
+    contentUICorner.CornerRadius = UDim.new(0, 14)
+
+    self.tabs = {}
+    self.activeTab = nil
+
+    self:_makeDraggable(self.mainFrame, self.titleLabel)
+
+    self.gui.Parent = game:GetService("CoreGui")
+
+    return self
+end
+
+function NoxUI:_makeDraggable(frame, dragHandle)
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            math.clamp(startPos.X.Scale, 0, 1),
+            math.clamp(startPos.X.Offset + delta.X, 0, workspace.CurrentCamera.ViewportSize.X - frame.AbsoluteSize.X),
+            math.clamp(startPos.Y.Scale, 0, 1),
+            math.clamp(startPos.Y.Offset + delta.Y, 0, workspace.CurrentCamera.ViewportSize.Y - frame.AbsoluteSize.Y)
+        )
+    end
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+end
+
+function NoxUI:CreateLabel(text, parent)
+    local label = create("TextLabel")
+    label.Text = text
+    label.TextColor3 = Colors.Text
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 16
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = parent
+    return label
+end
+
+function NoxUI:AddTab(name, iconId)
+    local tabButton = create("TextButton")
+    tabButton.Name = "Tab_"..name
+    tabButton.Size = UDim2.new(1, 0, 0, 40)
+    tabButton.BackgroundColor3 = Colors.TabBackground
+    tabButton.TextColor3 = Colors.Text
+    tabButton.Font = Enum.Font.GothamSemibold
+    tabButton.TextSize = 16
+    tabButton.TextXAlignment = Enum.TextXAlignment.Left
+    tabButton.Parent = self.tabsContainer
+    tabButton.AutoButtonColor = false
+
+    if iconId then
+        local icon = create("ImageLabel")
+        icon.Size = UDim2.new(0, 20, 0, 20)
+        icon.Position = UDim2.new(0, 10, 0.5, -10)
+        icon.BackgroundTransparency = 1
+        icon.Image = "rbxassetid://"..tostring(iconId)
+        icon.Parent = tabButton
+        tabButton.TextXAlignment = Enum.TextXAlignment.Left
+        tabButton.Text = "  " .. name
+    else
+        tabButton.Text = name
+        tabButton.TextXAlignment = Enum.TextXAlignment.Center
+    end
+
+    tabButton.MouseEnter:Connect(function()
+        if self.activeTab ~= tabButton then
+            tabButton.BackgroundColor3 = Colors.TabHover
+        end
+    end)
+    tabButton.MouseLeave:Connect(function()
+        if self.activeTab ~= tabButton then
+            tabButton.BackgroundColor3 = Colors.TabBackground
+        end
+    end)
+
+    local page = create("ScrollingFrame")
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.Position = UDim2.new(0, 0, 0, 0)
+    page.BackgroundTransparency = 1
+    page.Visible = false
+    page.Parent = self.contentFrame
+    page.CanvasSize = UDim2.new(0, 0, 5, 0)
+    page.ScrollBarThickness = 6
+
+    local uiLayout = Instance.new("UIListLayout", page)
+    uiLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    uiLayout.Padding = UDim.new(0, 8)
+
+    local uiPadding = Instance.new("UIPadding", page)
+    uiPadding.PaddingTop = UDim.new(0, 10)
+    uiPadding.PaddingLeft = UDim.new(0, 10)
+    uiPadding.PaddingRight = UDim.new(0, 10)
+
+    local function selectTab()
+        if self.activeTab then
+            self.activeTab.BackgroundColor3 = Colors.TabBackground
+            self.tabs[self.activeTab].Visible = false
+        end
+        self.activeTab = tabButton
+        tabButton.BackgroundColor3 = Colors.TabActive
+        page.Visible = true
+    end
+
+    tabButton.MouseButton1Click:Connect(selectTab)
+
+    self.tabs[tabButton] = page
+
+    if not self.activeTab then
+        selectTab()
+    end
+
+    return page
+end
+
+function NoxUI:AddButton(parent, text, callback)
+    local btn = create("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 38)
+    btn.BackgroundColor3 = Colors.Button
+    btn.TextColor3 = Colors.Text
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 18
+    btn.Text = text
+    btn.AutoButtonColor = false
+    btn.Parent = parent
+
+    local uicorner = Instance.new("UICorner", btn)
+    uicorner.CornerRadius = UDim.new(0, 8)
+
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Colors.ButtonHover
+    end)
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Colors.Button
+    end)
+    btn.MouseButton1Click:Connect(function()
+        if callback then
+            callback()
+        end
+    end)
+
+    return btn
+end
+
+function NoxUI:AddToggle(parent, text, initial, callback)
+    local frame = create("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 36)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = self:CreateLabel(text, frame)
+    label.Size = UDim2.new(1, -60, 1, 0)
+    label.Position = UDim2.new(0, 0, 0, 0)
+
+    local toggleBtn = create("Frame")
+    toggleBtn.Size = UDim2.new(0, 36, 0, 20)
+    toggleBtn.Position = UDim2.new(1, -46, 0.5, -10)
+    toggleBtn.BackgroundColor3 = Colors.ToggleOff
+    toggleBtn.Parent = frame
+    toggleBtn.ClipsDescendants = true
+
+    local uicorner = Instance.new("UICorner", toggleBtn)
+    uicorner.CornerRadius = UDim.new(1, 0)
+
+    local circle = create("Frame")
+    circle.Size = UDim2.new(0, 16, 0, 16)
+    circle.Position = UDim2.new(0, 2, 0.5, -8)
+    circle.BackgroundColor3 = Colors.Background
+    circle.Parent = toggleBtn
+
+    local circleCorner = Instance.new("UICorner", circle)
+    circleCorner.CornerRadius = UDim.new(1, 0)
+
+    local toggled = initial or false
+    local function updateToggle()
+        if toggled then
+            toggleBtn.BackgroundColor3 = Colors.ToggleOn
+            circle:TweenPosition(UDim2.new(1, -18, 0.5, -8), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+        else
+            toggleBtn.BackgroundColor3 = Colors.ToggleOff
+            circle:TweenPosition(UDim2.new(0, 2, 0.5, -8), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+        end
+    end
+
+    updateToggle()
+
+    toggleBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            toggled = not toggled
+            updateToggle()
+            if callback then callback(toggled) end
+        end
+    end)
+
+    return frame
+end
+
+function NoxUI:AddBind(parent, text, initialKey, callback)
+    local frame = create("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 36)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = self:CreateLabel(text, frame)
+    label.Size = UDim2.new(1, -100, 1, 0)
+    label.Position = UDim2.new(0, 0, 0, 0)
+
+    local bindBtn = create("TextButton")
+    bindBtn.Size = UDim2.new(0, 90, 1, 0)
+    bindBtn.Position = UDim2.new(1, -90, 0, 0)
+    bindBtn.BackgroundColor3 = Colors.BindBackground
+    bindBtn.TextColor3 = Colors.Text
+    bindBtn.Font = Enum.Font.GothamSemibold
+    bindBtn.TextSize = 16
+    bindBtn.Text = initialKey and tostring(initialKey) or "Bind"
+    bindBtn.AutoButtonColor = false
+    bindBtn.Parent = frame
+
+    local uicorner = Instance.new("UICorner", bindBtn)
+    uicorner.CornerRadius = UDim.new(0, 6)
+
+    local waitingForBind = false
+    local currentBind = initialKey
+
+    local function onInput(input)
+        if waitingForBind then
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                currentBind = input.KeyCode.Name
+                bindBtn.Text = currentBind
+                waitingForBind = false
+                if callback then callback(currentBind) end
+            end
+        end
+    end
+
+    bindBtn.MouseButton1Click:Connect(function()
+        if not waitingForBind then
+            waitingForBind = true
+            bindBtn.Text = "..."
+        end
+    end)
+
+    UserInputService.InputBegan:Connect(onInput)
+
+    return frame
+end
+
+function NoxUI:AddBox(parent, placeholder, callback)
+    local input = create("TextBox")
+    input.Size = UDim2.new(1, 0, 0, 35)
+    input.BackgroundColor3 = Colors.InputBackground
+    input.TextColor3 = Colors.Text
+    input.Font = Enum.Font.Gotham
+    input.TextSize = 18
+    input.PlaceholderText = placeholder or ""
+    input.ClearTextOnFocus = false
+    input.Parent = parent
+
+    local uicorner = Instance.new("UICorner", input)
+    uicorner.CornerRadius = UDim.new(0, 8)
+
+    input.Focused:Connect(function()
+        input.BackgroundColor3 = Colors.ButtonHover
+    end)
+    input.FocusLost:Connect(function(enterPressed)
+        input.BackgroundColor3 = Colors.InputBackground
+        if enterPressed and callback then
+            callback(input.Text)
+        end
+    end)
+
+    return input
+end
+
+function NoxUI:AddDropdown(parent, text, options, callback)
+    local frame = create("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 38)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = self:CreateLabel(text, frame)
+    label.Size = UDim2.new(1, -100, 1, 0)
+    label.Position = UDim2.new(0, 0, 0, 0)
+
+    local dropdownBtn = create("TextButton")
+    dropdownBtn.Size = UDim2.new(0, 90, 1, 0)
+    dropdownBtn.Position = UDim2.new(1, -90, 0, 0)
+    dropdownBtn.BackgroundColor3 = Colors.BindBackground
+    dropdownBtn.TextColor3 = Colors.Text
+    dropdownBtn.Font = Enum.Font.GothamSemibold
+    dropdownBtn.TextSize = 16
+    dropdownBtn.Text = "Select"
+    dropdownBtn.AutoButtonColor = false
+    dropdownBtn.Parent = frame
+
+    local uicorner = Instance.new("UICorner", dropdownBtn)
+    uicorner.CornerRadius = UDim.new(0, 6)
+
+    local open = false
+
+    local dropdownList = create("ScrollingFrame")
+    dropdownList.Size = UDim2.new(0, 90, 0, 120)
+    dropdownList.Position = UDim2.new(1, -90, 1, 4)
+    dropdownList.BackgroundColor3 = Colors.DropdownBackground
+    dropdownList.BorderSizePixel = 0
+    dropdownList.Visible = false
+    dropdownList.Parent = frame
+    dropdownList.ZIndex = 10
+    dropdownList.ScrollBarThickness = 6
+    dropdownList.ClipsDescendants = true
+
+    local uicorner2 = Instance.new("UICorner", dropdownList)
+    uicorner2.CornerRadius = UDim.new(0, 8)
+
+    local uiLayout = Instance.new("UIListLayout", dropdownList)
+    uiLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    uiLayout.Padding = UDim.new(0, 6)
+
+    local uiPadding = Instance.new("UIPadding", dropdownList)
+    uiPadding.PaddingTop = UDim.new(0, 6)
+    uiPadding.PaddingLeft = UDim.new(0, 6)
+    uiPadding.PaddingRight = UDim.new(0, 6)
+
+    local function closeDropdown()
+        open = false
+        dropdownList.Visible = false
+    end
+
+    local function openDropdown()
+        open = true
+        dropdownList.Visible = true
+    end
+
+    dropdownBtn.MouseButton1Click:Connect(function()
+        if open then
+            closeDropdown()
+        else
+            openDropdown()
+        end
+    end)
+
+    for i, option in ipairs(options) do
+        local optBtn = create("TextButton")
+        optBtn.Size = UDim2.new(1, 0, 0, 28)
+        optBtn.BackgroundColor3 = Colors.Button
+        optBtn.TextColor3 = Colors.Text
+        optBtn.Font = Enum.Font.Gotham
+        optBtn.TextSize = 16
+        optBtn.Text = option
+        optBtn.AutoButtonColor = false
+        optBtn.Parent = dropdownList
+
+        local uic = Instance.new("UICorner", optBtn)
+        uic.CornerRadius = UDim.new(0, 6)
+
+        optBtn.MouseEnter:Connect(function()
+            optBtn.BackgroundColor3 = Colors.ButtonHover
+        end)
+        optBtn.MouseLeave:Connect(function()
+            optBtn.BackgroundColor3 = Colors.Button
+        end)
+
+        optBtn.MouseButton1Click:Connect(function()
+            dropdownBtn.Text = option
+            closeDropdown()
+            if callback then
+                callback(option)
+            end
+        end)
+    end
+
+    UserInputService.InputBegan:Connect(function(input)
+        if open and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mousePos = UserInputService:GetMouseLocation()
+            local absPos = dropdownList.AbsolutePosition
+            local size = dropdownList.AbsoluteSize
+            if not (mousePos.X >= absPos.X and mousePos.X <= absPos.X + size.X and mousePos.Y >= absPos.Y and mousePos.Y <= absPos.Y + size.Y) then
+                closeDropdown()
+            end
+        end
+    end)
+
+    return frame
+end
+
+-- Colorpicker helper functions
+
+local function rgbToHsv(r, g, b)
+    local max = math.max(r, g, b)
+    local min = math.min(r, g, b)
+    local h, s, v
+
+    v = max
+    local d = max - min
+    if max == 0 then
+        s = 0
+        h = 0
+    else
+        s = d / max
+        if max == min then
+            h = 0
+        elseif max == r then
+            h = (g - b) / d
+            if g < b then h = h + 6 end
+        elseif max == g then
+            h = 2 + (b - r) / d
+        else
+            h = 4 + (r - g) / d
+        end
+        h = h / 6
+    end
+
+    return h, s, v
+end
+
+local function hsvToRgb(h, s, v)
+    local r, g, b
+
+    local i = math.floor(h * 6)
+    local f = h * 6 - i
+    local p = v * (1 - s)
+    local q = v * (1 - f * s)
+    local t = v * (1 - (1 - f) * s)
+
+    i = i % 6
+
+    if i == 0 then r, g, b = v, t, p
+    elseif i == 1 then r, g, b = q, v, p
+    elseif i == 2 then r, g, b = p, v, t
+    elseif i == 3 then r, g, b = p, q, v
+    elseif i == 4 then r, g, b = t, p, v
+    else r, g, b = v, p, q
+    end
+
+    return r, g, b
+end
+
+function NoxUI:AddColorPicker(parent, text, initialColor, callback)
+    local frame = create("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 150)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = self:CreateLabel(text, frame)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.Size = UDim2.new(1, 0, 0, 20)
+
+    local colorDisplay = create("Frame")
+    colorDisplay.Size = UDim2.new(0, 40, 0, 40)
+    colorDisplay.Position = UDim2.new(1, -45, 0, 0)
+    colorDisplay.BackgroundColor3 = initialColor or Color3.new(1, 1, 1)
+    colorDisplay.BorderSizePixel = 1
+    colorDisplay.Parent = frame
+
+    local uicornerCD = Instance.new("UICorner", colorDisplay)
+    uicornerCD.CornerRadius = UDim.new(0, 8)
+
+    local pickerFrame = create("Frame")
+    pickerFrame.Size = UDim2.new(1, 0, 0, 120)
+    pickerFrame.Position = UDim2.new(0, 0, 0, 30)
+    pickerFrame.BackgroundColor3 = Colors.ColorPickerBackground
+    pickerFrame.Visible = false
+    pickerFrame.ClipsDescendants = true
+    pickerFrame.Parent = frame
+
+    local uicornerPF = Instance.new("UICorner", pickerFrame)
+    uicornerPF.CornerRadius = UDim.new(0, 12)
+
+    local hue = 0
+    local saturation = 1
+    local value = 1
+    local alpha = 1
+
+    local draggingPicker = false
+    local draggingHue = false
+    local draggingAlpha = false
+
+    local pickerSize = UDim2.new(1, -60, 1, 0)
+
+    local pickerArea = create("Frame")
+    pickerArea.Size = UDim2.new(0, 120, 0, 120)
+    pickerArea.Position = UDim2.new(0, 0, 0, 0)
+    pickerArea.BackgroundColor3 = Color3.new(1, 0, 0)
+    pickerArea.BorderSizePixel = 0
+    pickerArea.Parent = pickerFrame
+    pickerArea.ClipsDescendants = true
+
+    local pickerCorner = Instance.new("UICorner", pickerArea)
+    pickerCorner.CornerRadius = UDim.new(0, 12)
+
+    local saturationValOverlay = create("ImageLabel")
+    saturationValOverlay.Size = UDim2.new(1, 0, 1, 0)
+    saturationValOverlay.BackgroundTransparency = 1
+    saturationValOverlay.Image = "rbxassetid://7072712024" -- gradient overlay (white to transparent)
+    saturationValOverlay.Parent = pickerArea
+
+    local pickerCursor = create("Frame")
+    pickerCursor.Size = UDim2.new(0, 16, 0, 16)
+    pickerCursor.BackgroundColor3 = Color3.new(1, 1, 1)
+    pickerCursor.BorderColor3 = Color3.new(0, 0, 0)
+    pickerCursor.BorderSizePixel = 2
+    pickerCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+    pickerCursor.Position = UDim2.new(1, 0, 0, 0)
+    pickerCursor.Parent = pickerArea
+
+    local uicursorCorner = Instance.new("UICorner", pickerCursor)
+    uicursorCorner.CornerRadius = UDim.new(1, 0)
+
+    local hueSliderFrame = create("Frame")
+    hueSliderFrame.Size = UDim2.new(0, 20, 0, 120)
+    hueSliderFrame.Position = UDim2.new(0, 130, 0, 0)
+    hueSliderFrame.BackgroundColor3 = Color3.new(1, 0, 0)
+    hueSliderFrame.BorderSizePixel = 0
+    hueSliderFrame.Parent = pickerFrame
+    hueSliderFrame.ClipsDescendants = true
+
+    local hueGradient = Instance.new("UIGradient", hueSliderFrame)
+    hueGradient.Rotation = 90
+    hueGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+        ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+        ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+    }
+
+    local hueCursor = create("Frame")
+    hueCursor.Size = UDim2.new(1, 0, 0, 4)
+    hueCursor.BackgroundColor3 = Color3.new(1, 1, 1)
+    hueCursor.BorderSizePixel = 0
+    hueCursor.Parent = hueSliderFrame
+    hueCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+
+    local alphaSliderFrame = create("Frame")
+    alphaSliderFrame.Size = UDim2.new(0, 20, 0, 120)
+    alphaSliderFrame.Position = UDim2.new(0, 160, 0, 0)
+    alphaSliderFrame.BackgroundColor3 = Colors.Background
+    alphaSliderFrame.BorderSizePixel = 1
+    alphaSliderFrame.Parent = pickerFrame
+    alphaSliderFrame.ClipsDescendants = true
+
+    local alphaGradient = Instance.new("UIGradient", alphaSliderFrame)
+    alphaGradient.Rotation = 90
+    alphaGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.new(0, 0, 0, 0)),
+        ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0, 1))
+    }
+
+    local alphaCursor = create("Frame")
+    alphaCursor.Size = UDim2.new(1, 0, 0, 4)
+    alphaCursor.BackgroundColor3 = Color3.new(1, 1, 1)
+    alphaCursor.BorderSizePixel = 0
+    alphaCursor.Parent = alphaSliderFrame
+    alphaCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+
+    local function updatePicker()
+        local r, g, b = hsvToRgb(hue, saturation, value)
+        colorDisplay.BackgroundColor3 = Color3.new(r, g, b)
+        local hsv = Color3.fromHSV(hue, saturation, value)
+        pickerArea.BackgroundColor3 = hsv
+        pickerCursor.Position = UDim2.new(saturation, 0, 1 - value, 0)
+        hueCursor.Position = UDim2.new(0.5, 0, hue, 0)
+        alphaCursor.Position = UDim2.new(0.5, 0, 1 - alpha, 0)
+        if callback then callback(Color3.new(r, g, b), alpha) end
+    end
+
+    local function updateFromPicker(pos)
+        local x = math.clamp(pos.X - pickerArea.AbsolutePosition.X, 0, pickerArea.AbsoluteSize.X)
+        local y = math.clamp(pos.Y - pickerArea.AbsolutePosition.Y, 0, pickerArea.AbsoluteSize.Y)
+        saturation = x / pickerArea.AbsoluteSize.X
+        value = 1 - y / pickerArea.AbsoluteSize.Y
+        updatePicker()
+    end
+
+    local function updateFromHue(pos)
+        local y = math.clamp(pos.Y - hueSliderFrame.AbsolutePosition.Y, 0, hueSliderFrame.AbsoluteSize.Y)
+        hue = y / hueSliderFrame.AbsoluteSize.Y
+        updatePicker()
+    end
+
+    local function updateFromAlpha(pos)
+        local y = math.clamp(pos.Y - alphaSliderFrame.AbsolutePosition.Y, 0, alphaSliderFrame.AbsoluteSize.Y)
+        alpha = 1 - y / alphaSliderFrame.AbsoluteSize.Y
+        updatePicker()
+    end
+
+    pickerArea.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingPicker = true
+            updateFromPicker(input.Position)
+        end
+    end)
+    pickerArea.InputChanged:Connect(function(input)
+        if draggingPicker and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            updateFromPicker(input.Position)
+        end
+    end)
+    pickerArea.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingPicker = false
+        end
+    end)
+
+    hueSliderFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingHue = true
+            updateFromHue(input.Position)
+        end
+    end)
+    hueSliderFrame.InputChanged:Connect(function(input)
+        if draggingHue and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            updateFromHue(input.Position)
+        end
+    end)
+    hueSliderFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingHue = false
+        end
+    end)
+
+    alphaSliderFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingAlpha = true
+            updateFromAlpha(input.Position)
+        end
+    end)
+    alphaSliderFrame.InputChanged:Connect(function(input)
+        if draggingAlpha and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            updateFromAlpha(input.Position)
+        end
+    end)
+    alphaSliderFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingAlpha = false
+        end
+    end)
+
+    colorDisplay.MouseButton1Click:Connect(function()
+        pickerFrame.Visible = not pickerFrame.Visible
+    end)
+
+    updatePicker()
+
+    return frame
+end
 
